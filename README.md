@@ -150,4 +150,4 @@ build.sh / test.sh   本机构建与离线检查
 
 本项目采用 [MIT License](LICENSE)。额度模块和部分 Touch Bar 系统桥接复用了 [AI Agent Usage Widget](https://github.com/lazyfoxy33-dev/ai-agent-usage-widget)，保留上游 MIT 版权声明。详见 [第三方说明](THIRD_PARTY_NOTICES.md)。
 
-这是一个独立社区项目，与 Apple、OpenAI 或 Moonshot AI 没有官方关联。
+这是一个独立社区项目，与 Apple、OpenAI 或月之暗面（Kimi）没有官方关联。
