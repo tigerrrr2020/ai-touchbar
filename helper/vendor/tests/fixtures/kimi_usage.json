@@ -1,0 +1,33 @@
+{
+  "usage": {
+    "limit": 1000,
+    "remaining": 920,
+    "resetTime": {
+      "seconds": "1781600000"
+    }
+  },
+  "limits": [
+    {
+      "window": {
+        "duration": 60,
+        "timeUnit": "MINUTE"
+      },
+      "detail": {
+        "limit": 100,
+        "remaining": 90,
+        "resetAt": "2026-06-11T13:00:00Z"
+      }
+    },
+    {
+      "window": {
+        "duration": 300,
+        "timeUnit": "MINUTE"
+      },
+      "detail": {
+        "limit": 100,
+        "used": 34,
+        "reset_at": 1781190000
+      }
+    }
+  ]
+}
