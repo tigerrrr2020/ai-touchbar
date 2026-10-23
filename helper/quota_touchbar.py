@@ -317,11 +317,12 @@ def render_png(codex_result, kimi_result):
             label("?", ox + 82, 19, white)
             continue
         windows = (("five_h", "HOUR"), ("weekly", "WEEK"))
-        if result.get("ok") and result.get("live") is not False and result.get("windows_known") and result.get("five_h") is None:
-            windows = (("weekly", "WEEK"),)
-        elif result.get("ok") and result.get("live") is not False and result.get("windows_known") and result.get("weekly") is None:
-            windows = (("five_h", "HOUR"),)
         readings = {key: _quota(result, key) for key, _ in windows}
+        # A window the provider says the plan does not have stays visible but
+        # dimmed (known-absent), so a later plan change lights it up again;
+        # "?" is reserved for genuinely unknown data.
+        known_absent = {key: pct is None and result.get("ok") and result.get("windows_known")
+                        and result.get(key) is None for key, (pct, _old) in readings.items()}
         exhausted = {key: pct is not None and pct >= 100 and not old and result.get("live") is not False
                      for key, (pct, old) in readings.items()}
         if len(windows) > 1 and all(exhausted.values()):
@@ -337,9 +338,9 @@ def render_png(codex_result, kimi_result):
                 glyph("!", ox + 110, y, warning)
             else:
                 bar(bx, y, gray if pct is None else amber if old else accent, pct)
-                if pct is None:
+                if pct is None and not known_absent.get(key, False):
                     glyph("?", bx + 22, y, white)
-                label(title, ox + 82, y, white)
+                label(title, ox + 82, y, (135, 140, 148) if known_absent.get(key, False) else white)
                 if old:
                     glyph("!", ox + 110, y, amber)
 
@@ -538,8 +539,8 @@ def _self_test():
     weekly_only = {"ok": True, "live": True, "windows_known": True,
                    "five_h": None, "weekly": {"pct": 100}}
     png = render_png(weekly_only, weekly_only)
-    assert has_pixel(png, 25, 13, warning) and has_pixel(png, 145, 13, warning)
-    assert not has_pixel(png, 25, 7, warning) and not has_pixel(png, 145, 20, warning)
+    assert has_pixel(png, 25, 20, warning) and has_pixel(png, 145, 20, warning)
+    assert not has_pixel(png, 25, 7, warning) and not has_pixel(png, 145, 7, warning)
     blocked = dict(all_exhausted, monthly_state="blocked")
     png = render_png(all_exhausted, blocked)
     assert has_pixel(png, 145, 13, warning) and not has_pixel(png, 145, 7, warning)
@@ -581,8 +582,24 @@ def _self_test():
     unknown_png = render_png({"ok": False, "five_h": None, "weekly": None, "windows_known": True},
                              {"ok": False})
     assert has_white(png, 82, 6)  # HOUR in the normal two-window layout.
-    assert has_white(weekly_png, 82, 12) and not has_white(weekly_png, 82, 6)
-    assert has_white(unknown_png, 82, 6)  # Unknown does not hide HOUR.
+    assert has_white(unknown_png, 82, 6)  # Unknown does not dim HOUR.
+    # A plan without a 5-hour window keeps the HOUR row, dimmed and without
+    # "?": the window is known-absent, not unknown. Same for live and stale
+    # readings, and a missing window never joins the WAIT merge.
+    dim = (135, 140, 148)
+    for weekly_only_live in (True, False):
+        weekly_only = {"ok": True, "live": weekly_only_live, "windows_known": True,
+                       "five_h": None, "weekly": {"pct": 100}}
+        weekly_png = render_png(weekly_only, {"ok": False})
+        assert not has_white(weekly_png, 48, 6)  # no "?" on the absent HOUR row
+        assert has_pixel(weekly_png, 82, 6, dim)  # HOUR label dimmed
+        assert has_pixel(weekly_png, 25, 20, warning) == weekly_only_live  # stale data never claims exhaustion
+        assert not has_pixel(weekly_png, 25, 7, warning)
+    five_h_only = {"ok": True, "live": True, "windows_known": True,
+                   "five_h": {"pct": 30}, "weekly": None}
+    five_h_only_png = render_png(five_h_only, {"ok": False})
+    assert has_white(five_h_only_png, 82, 6)  # live HOUR label stays white
+    assert has_pixel(five_h_only_png, 82, 19, dim)  # WEEK label dimmed
 
 
 def main(argv=None):
