@@ -10,9 +10,9 @@
 
 AI Touch Bar 是一个原生 macOS 菜单栏小应用，把 **Codex / Kimi Code 的额度与任务状态**放到 Touch Bar：不必反复切窗口，也不用一直盯着一串百分比。
 
-[下载安装包](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.4) · [从源码构建](#从源码构建) · [开发交接](docs/HANDOFF.md) · [隐私与数据访问](docs/PRIVACY.md) · [MIT 许可证](LICENSE)
+[下载安装包](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.5) · [从源码构建](#从源码构建) · [开发交接](docs/HANDOFF.md) · [隐私与数据访问](docs/PRIVACY.md) · [MIT 许可证](LICENSE)
 
-> 当前版本：**0.2.4 · 实验性预发布版**，源码与 Apple Silicon 安装包均已发布，修复 Kimi 完成状态不显示的问题（daemon 结局字段为 `done`），真实任务链路已在本机验收。不依赖 BetterTouchTool（BTT）。Codex 需要手动选择监看的任务；Kimi 可自动监看唯一活动任务，或手动指定一个任务。两者都不会自动跟随当前对话页面。
+> 当前版本：**0.2.5 · 实验性预发布版**，源码与 Apple Silicon 安装包均已发布。本版重排操作框界面：实时概览按模型分卡、监看任务单行对齐、移除重复的 Touch Bar 按钮与测试入口，不含读取逻辑改动。不依赖 BetterTouchTool（BTT）。Codex 需要手动选择监看的任务；Kimi 可自动监看唯一活动任务，或手动指定一个任务。两者都不会自动跟随当前对话页面。
 
 ## 看一眼，就知道 AI 在忙什么
 
@@ -61,7 +61,7 @@ GIF 按 **思考 → 命令 → 改文件 → 等待审批 → 完成** 顺序�
 
 ### 安装
 
-1. 下载 [AI-Touch-Bar-v0.2.4-macos-arm64.zip](https://github.com/tigerrrr2020/ai-touchbar/releases/download/v0.2.4/AI-Touch-Bar-v0.2.4-macos-arm64.zip) 和 [SHA256SUMS.txt](https://github.com/tigerrrr2020/ai-touchbar/releases/download/v0.2.4/SHA256SUMS.txt)。将二者放在同一目录，运行 `shasum -a 256 -c SHA256SUMS.txt` 核对完整性；更新内容见 [v0.2.4 Release](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.4)。
+1. 下载 [AI-Touch-Bar-v0.2.5-macos-arm64.zip](https://github.com/tigerrrr2020/ai-touchbar/releases/download/v0.2.5/AI-Touch-Bar-v0.2.5-macos-arm64.zip) 和 [SHA256SUMS.txt](https://github.com/tigerrrr2020/ai-touchbar/releases/download/v0.2.5/SHA256SUMS.txt)。将二者放在同一目录，运行 `shasum -a 256 -c SHA256SUMS.txt` 核对完整性；更新内容见 [v0.2.5 Release](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.5)。
 2. 解压，将 `AI Touch Bar.app` 拖到“应用程序”。更新旧版前，先从图钉菜单选择“退出”。
 3. 从“应用程序”打开 App，在操作框点击“显示 Touch Bar”。首次启动不会自动接管 Touch Bar。
 4. Codex：刷新任务列表，手动选择要监看的任务。Kimi：默认自动监看唯一活动任务；多个任务并行时，可在 Kimi 下拉框指定一个任务，也可选择不监看。
@@ -133,10 +133,11 @@ python3 "/Applications/AI Touch Bar.app/Contents/Resources/helper/quota_touchbar
 | 0.2.2：Kimi 月额度恢复 | 已修复旧月限额记录持续遮挡当前额度的问题；支持明确的本机恢复确认，新的限额错误仍优先显示。 |
 | 0.2.3：Kimi 任务选择器 | 已实现并安装验证；支持自动、指定任务、不监看，以及切换时清除旧状态、丢弃过期响应。 |
 | 0.2.4：Kimi 完成状态修复 | 真实联调发现 daemon 结局字段为 `done` 而非 `success`，导致完成状态从不触发；已修复并补离线回归，真实任务链路（自动、并发、审批、隔离、空闲隐藏）已验收。 |
+| 0.2.5：操作框界面重排 | 实时概览按模型分卡、监看任务单行对齐、刷新合并到标题行、移除重复按钮与测试入口；纯界面改动，已安装验证。 |
 | 工程验证 | 10 项状态桥接测试、44 项上游模块测试、额度／状态自检、原生 AppKit 自检及签名检查通过。 |
 | 界面验证 | 已检查安装版的下拉选项、停用后隐藏、刷新保留选择，以及 CODEX／KIMI 模拟动画布局；已切回实时模式。 |
 | 真实 Kimi 流程 | 已在本机真实任务验收：自动匹配、双任务并发隐藏、指定任务隔离、审批识别、空闲隐藏均通过；联调中发现的完成状态解析问题已在 0.2.4 修复。 |
-| 下载包 | 已发布 [v0.2.4 预发布包](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.4)及 SHA-256 校验文件；仅 arm64、ad-hoc 签名、未公证。v0.2.1 与 v0.2.3 保留，0.2.2 未单独发布。 |
+| 下载包 | 已发布 [v0.2.5 预发布包](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.5)及 SHA-256 校验文件；仅 arm64、ad-hoc 签名、未公证。v0.2.1、v0.2.3 与 v0.2.4 保留，0.2.2 未单独发布。 |
 
 下一步只剩服务断连恢复（10 秒保留）的实测，不继续改动画或额度规则。代码入口、测试命令、已排除的错误路线和接手清单见 [HANDOFF](docs/HANDOFF.md)。
 
