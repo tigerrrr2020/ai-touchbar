@@ -1,18 +1,30 @@
 # AI Touch Bar · 开发交接
 
-更新：2026-10-23（Asia/Shanghai，0.2.7 发布后） · 源码／本机安装／发布版本：0.2.7
+更新：2026-10-23（Asia/Shanghai，0.2.8 发布后） · 源码／本机安装／发布版本：0.2.8
 
 ## 先看结论
 
-当前是独立的 Swift / AppKit 菜单栏 App，不再依赖 BTT。本机“应用程序”已替换为 0.2.7（套餐没有的额度窗口置灰保留）；被替换的旧版备份在 `~/Documents/ai-touchbar-backups/` 与 `../outputs/`。真实 Kimi 联调已在 0.2.4 上完成：自动匹配、等待审批、并发隐藏、指定任务隔离、空闲隐藏均在本机真实任务上验证；联调中发现并修复了完成状态从不触发的问题（daemon 结局字段为 `done` 而非 `success`）。服务断连恢复（10 秒保留）尚未实测。
+当前是独立的 Swift / AppKit 菜单栏 App，不再依赖 BTT。本机“应用程序”已替换为 0.2.8（图标刷新；状态与额度逻辑与 0.2.7 相同）；安装前的 0.2.7 备份在 `/tmp/ai-touchbar-installed-0.2.7-backup-20261023-204352.app`（临时目录），更早的备份在 `~/Documents/ai-touchbar-backups/` 与 `../outputs/`。真实 Kimi 联调已在 0.2.4 上完成：自动匹配、等待审批、并发隐藏、指定任务隔离、空闲隐藏均在本机真实任务上验证；联调中发现并修复了完成状态从不触发的问题（daemon 结局字段为 `done` 而非 `success`）。服务断连恢复（10 秒保留）尚未实测。
 
-0.2.7 已发布 **[v0.2.7 预发布版](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.7)**，包含 `AI-Touch-Bar-v0.2.7-macos-arm64.zip` 与 `SHA256SUMS.txt`，上传附件与本地 SHA-256 一致。README 下载入口已切到 0.2.7；v0.2.1、v0.2.3–v0.2.6 的 tag、Release 和附件保留，0.2.2 未单独发布。后续版本发布仍按当时请求确认范围。
+0.2.8 已发布 **[v0.2.8 预发布版](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.8)**，包含 `AI-Touch-Bar-v0.2.8-macos-arm64.zip` 与 `SHA256SUMS.txt`，上传附件与本地 SHA-256 一致。README 下载入口已切到 0.2.8；v0.2.1、v0.2.3–v0.2.7 的 tag、Release 和附件保留，0.2.2 未单独发布。后续版本发布仍按当时请求确认范围。
+
+0.2.7 已发布 **[v0.2.7 预发布版](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.7)**，包含 `AI-Touch-Bar-v0.2.7-macos-arm64.zip` 与 `SHA256SUMS.txt`；README 下载入口当时切到 0.2.7，0.2.8 发布后已切到 0.2.8。
 
 ## 已完成
 
+### 图标刷新（0.2.8，已安装并发布）
+
+已发布 **[v0.2.8 预发布版](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.8)**，包含 `AI-Touch-Bar-v0.2.8-macos-arm64.zip` 与 `SHA256SUMS.txt`；上传附件与本地 SHA-256 一致。README 下载入口已切到 0.2.8。
+
+- App 图标改为以菜单栏图钉为主体：白色图钉本体 + 左下针体绿/青渐变 + 深色刻度线，不再单独绘制进度条。
+- 菜单栏保留原图钉造型，仅扩大 SVG viewBox 留白，18px 下更接近系统图标比例；Touch Bar 恢复按钮继续共用这枚图钉。
+- 资源：`Assets/AppIcon.png`（1024×1024）、`Assets/AppIcon.icns`、`Assets/menubar-pin.svg`；版本号改为 0.2.8。
+- 仅图标资源与版本号变化，无代码或状态逻辑改动；`build.sh`、`test.sh`（10 项桥接、44 项上游模块、AppKit self-test）、`codesign --verify --deep --strict`、ZIP 完整性及解压后签名检查通过。
+- 本机已安装 0.2.8 并重启菜单栏进程；安装前旧版备份见“先看结论”。
+
 ### 套餐缺失窗口置灰保留（0.2.7，已安装并发布）
 
-已发布 **[v0.2.7 预发布版](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.7)**，包含 `AI-Touch-Bar-v0.2.7-macos-arm64.zip` 与 `SHA256SUMS.txt`，上传附件与本地 SHA-256 一致；README 下载入口已切到 0.2.7。
+已发布 **[v0.2.7 预发布版](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.7)**，包含 `AI-Touch-Bar-v0.2.7-macos-arm64.zip` 与 `SHA256SUMS.txt`，上传附件与本地 SHA-256 一致；README 下载入口当时已切到 0.2.7。
 
 - 根因：`render_png` 只在数据新鲜时按 `windows_known` 隐藏缺失窗口；缓存数据会让 HOUR 行复活并显示 `?`（`?` 本应只表示数据未知）。
 - 修复：接口明确说套餐没有的窗口（`ok` + `windows_known` + 窗口为 `null`）一律置灰保留——灰标签、空条、无 `?`，新鲜与缓存数据行为一致；之后套餐变更恢复该窗口时自动点亮。缓存数据仍不误报 WAIT。
@@ -66,17 +78,9 @@ Kimi 当前用量接口未提供月额度字段。小时／周显示有余量，
 ### 保持不变
 
 - Codex 手动监看一个任务；两种提供商都不自动跟随当前对话页面。
-- 像素字体、两组状态动画、额度刻度与红色 `WAIT!` 规则、Touch Bar 收起／恢复行为保持不变；菜单栏图钉造型保留（App 图标更新见下节）。
+- 像素字体、两组状态动画、额度刻度与红色 `WAIT!` 规则、Touch Bar 收起／恢复行为保持不变；菜单栏图钉造型保留（App 图标见 0.2.8 记录）。
 - `⌘W`／红色关闭按钮只关闭操作框；退出仍走图钉菜单。没有开机自启、自动更新、听写或 Siri 替换。
 - 不恢复 BTT、不自动启动 Kimi 服务、不自动审批或创建任务。
-
-### 图标更新（2026-10-23）
-
-- App 图标改为以菜单栏图钉为主体：白色图钉本体 + 左下针体绿/青渐变 + 深色刻度线，不再单独绘制进度条。
-- 菜单栏保留原图钉造型，仅扩大 SVG viewBox 留白，18px 下更接近系统图标比例；Touch Bar 恢复按钮继续共用这枚图钉。
-- 资源：`Assets/AppIcon.png`（1024×1024）、`Assets/AppIcon.icns`、`Assets/menubar-pin.svg`。
-- 仅图标资源变化，无代码或状态逻辑改动；本机构建、`--self-test`、`codesign --verify --deep --strict` 通过。
-- `main` 已更新图标；已发布的 0.2.7 安装包未重新打包，下一次发布生效。本机已安装的 0.2.7 副本是就地替换资源并重签的，不代表发布包已更新。
 
 ## 接手代码入口
 
@@ -121,14 +125,14 @@ Kimi 当前用量接口未提供月额度字段。小时／周显示有余量，
 
 ## 验证记录与边界
 
-以下记录对应本次 0.2.3 源码和安装版，不代表所有硬件或提供商版本：
+以下记录对应本次 0.2.8 源码和本机安装；部分历史验证来自更早版本：
 
 | 验证层 | 已有证据 | 尚不能证明 |
 | --- | --- | --- |
 | Python 回归 | 10 项状态桥接测试、44 项上游模块测试、bridge 生命周期检查、状态与额度自检通过。 | 真实 daemon 返回的数据完全符合假设。 |
 | Swift 自检 | 选择／身份／代次、A→B→停用、grace、模拟数据、菜单图标、窗口关闭、Touch Bar 恢复按钮、状态帧、超时与异常 JSON 检查通过。 | 实体设备上真实任务的完整状态转换。 |
-| 安装一致性 | 本机 App 版本为 0.2.7；签名校验通过，变更 helper 与源码逐字节一致。 | Developer ID 签名或 Apple 公证；当前只有 ad-hoc 签名。 |
-| 发布产物 | 0.2.3 重新构建、离线测试、ZIP 完整性及解压后签名检查通过；上传附件与本地 SHA-256 一致。 | 真实 Kimi 联调、Intel 或其他系统版本的兼容性。 |
+| 安装一致性 | 本机 App 版本为 0.2.8；签名校验通过，变更 helper 与源码逐字节一致。 | Developer ID 签名或 Apple 公证；当前只有 ad-hoc 签名。 |
+| 发布产物 | 0.2.8 重新构建、离线测试、ZIP 完整性及解压后签名检查通过；上传附件与本地 SHA-256 一致。 | 真实 Kimi 联调、Intel 或其他系统版本的兼容性。 |
 | 安装版 UI | 自动／不监看选项可见；停用隐藏状态但保留额度；刷新不重置选择；两组模拟动画布局已检查，随后切回实时模式。 | 真实任务 A／B 的下拉切换。当前服务未连接，列表中没有可用真实任务。 |
 | 实体 Touch Bar | 之前已有人确认五种模拟状态、布局、空闲隐藏及图钉收起／展开正常。 | 新选择器在真实 Kimi 并发、审批、完成、服务重启时的设备表现。 |
 
