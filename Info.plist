@@ -5,8 +5,8 @@
   <key>CFBundleName</key><string>AI Touch Bar</string>
   <key>CFBundleDisplayName</key><string>AI Touch Bar</string>
   <key>CFBundleIdentifier</key><string>local.codex.touchbar-native-live</string>
-  <key>CFBundleVersion</key><string>0.2.5</string>
-  <key>CFBundleShortVersionString</key><string>0.2.5</string>
+  <key>CFBundleVersion</key><string>0.2.6</string>
+  <key>CFBundleShortVersionString</key><string>0.2.6</string>
   <key>CFBundleExecutable</key><string>TouchBarNativeLive</string>
   <key>CFBundleIconFile</key><string>AppIcon.icns</string>
   <key>CFBundlePackageType</key><string>APPL</string>

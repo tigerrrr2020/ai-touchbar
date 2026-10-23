@@ -151,6 +151,10 @@ final class NativeUI: NSObject, NSApplicationDelegate {
         // 实时概览：每个模型一张卡片，上方为该模型额度（整图裁半），下方为状态动画。
         // 新增模型时向 providerCards 追加一张卡片即可，卡片横向等宽排列。
         makeHeading("实时概览", x: 24, y: 282, width: 592)
+        let version = NSTextField(labelWithString: "v" + (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"))
+        version.frame = NSRect(x: 516, y: 282, width: 100, height: 18)
+        version.alignment = .right
+        styleNote(version); content.addSubview(version)
         title.frame = NSRect(x: 24, y: 260, width: 592, height: 16)
         styleNote(title); content.addSubview(title)
         let providerCards: [(quota: NSImageView, status: NSImageView, statusWidth: CGFloat, unknown: NSTextField)] = [
