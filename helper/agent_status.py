@@ -272,7 +272,7 @@ def _kimi_status(path):
                 pending_approvals.clear()
                 outcome = record.get("outcome")
                 event_age = _age(record.get("time"))
-                status = "完成" if outcome == "success" and event_age is not None and 0 <= event_age <= COMPLETED_SECONDS else "未知"
+                status = "完成" if outcome in ("success", "done") and event_age is not None and 0 <= event_age <= COMPLETED_SECONDS else "未知"
             elif kind == "turn.cancel":
                 pending_approvals.clear()
                 status = "空闲"
@@ -569,6 +569,33 @@ def _self_test():
                 stream.write(json.dumps(record) + "\n")
             stream.flush()
             assert _codex_status(stream.name) == expected, (records[-1], expected)
+
+    def kimi_event(kind, **fields):
+        record = {"type": kind}
+        record.update(fields)
+        return record
+
+    now_ms = time.time() * 1000
+    kimi_scenarios = (
+        # Real daemons report a finished turn with outcome "done" (milliseconds).
+        ([kimi_event("agent.turn.ended", outcome="done", time=now_ms),
+          kimi_event("turn.ended", time=now_ms)], "完成"),
+        ([kimi_event("agent.turn.ended", outcome="success", time=now_ms)], "完成"),
+        ([kimi_event("agent.turn.ended", outcome="done", time=now_ms / 1000)], "完成"),
+        ([kimi_event("agent.turn.ended", outcome="done",
+                     time=(time.time() - COMPLETED_SECONDS - 1) * 1000)], "未知"),
+        ([kimi_event("agent.turn.ended", outcome="error", time=now_ms)], "未知"),
+        ([kimi_event("turn.ended", time=now_ms)], "未知"),
+        ([kimi_event("agent.turn.started")], "思考"),
+        ([kimi_event("agent.turn.ended", outcome="done", time=now_ms),
+          kimi_event("agent.turn.started")], "思考"),
+    )
+    for records, expected in kimi_scenarios:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as stream:
+            for record in records:
+                stream.write(json.dumps(record) + "\n")
+            stream.flush()
+            assert _kimi_status(stream.name) == expected, (records[-1], expected)
 
     with tempfile.NamedTemporaryFile(mode="wb") as stream:
         huge_output = codex_event("function_call_output")
