@@ -10,9 +10,9 @@
 
 AI Touch Bar 是一个原生 macOS 菜单栏小应用，把 **Codex / Kimi Code 的额度与任务状态**放到 Touch Bar：不必反复切窗口，也不用一直盯着一串百分比。
 
-[下载安装包](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.1) · [从源码构建](#从源码构建) · [开发交接](docs/HANDOFF.md) · [隐私与数据访问](docs/PRIVACY.md) · [MIT 许可证](LICENSE)
+[下载安装包](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.3) · [从源码构建](#从源码构建) · [开发交接](docs/HANDOFF.md) · [隐私与数据访问](docs/PRIVACY.md) · [MIT 许可证](LICENSE)
 
-> 当前源码：**0.2.3，尚未发布对应安装包**；下载链接仍为 **0.2.1 预发布版**，不包含下述 Kimi 任务选择器和月额度恢复修复。实验性开源项目，不依赖 BetterTouchTool（BTT）。Codex 需要手动选择监看的任务；0.2.3 的 Kimi 可自动监看唯一活动任务，或手动指定一个任务。两者都不会自动跟随当前对话页面。
+> 当前版本：**0.2.3 · 实验性预发布版**，源码与 Apple Silicon 安装包均已发布，包含 Kimi 任务选择器和月额度恢复修复。不依赖 BetterTouchTool（BTT）。Codex 需要手动选择监看的任务；Kimi 可自动监看唯一活动任务，或手动指定一个任务。两者都不会自动跟随当前对话页面。
 
 ## 看一眼，就知道 AI 在忙什么
 
@@ -61,10 +61,10 @@ GIF 按 **思考 → 命令 → 改文件 → 等待审批 → 完成** 顺序�
 
 ### 安装
 
-1. 在 [Releases](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.1) 下载 `AI-Touch-Bar-v0.2.1-macos-arm64.zip`，可用同页 `SHA256SUMS.txt` 校验。
+1. 下载 [AI-Touch-Bar-v0.2.3-macos-arm64.zip](https://github.com/tigerrrr2020/ai-touchbar/releases/download/v0.2.3/AI-Touch-Bar-v0.2.3-macos-arm64.zip) 和 [SHA256SUMS.txt](https://github.com/tigerrrr2020/ai-touchbar/releases/download/v0.2.3/SHA256SUMS.txt)。将二者放在同一目录，运行 `shasum -a 256 -c SHA256SUMS.txt` 核对完整性；更新内容见 [v0.2.3 Release](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.3)。
 2. 解压，将 `AI Touch Bar.app` 拖到“应用程序”。更新旧版前，先从图钉菜单选择“退出”。
 3. 从“应用程序”打开 App，在操作框点击“显示 Touch Bar”。首次启动不会自动接管 Touch Bar。
-4. Codex：刷新任务列表，手动选择要监看的任务。下载版 0.2.1 的 Kimi 仅自动监看唯一活动任务；需要手动选择 Kimi 任务时，请构建 0.2.3 源码版。
+4. Codex：刷新任务列表，手动选择要监看的任务。Kimi：默认自动监看唯一活动任务；多个任务并行时，可在 Kimi 下拉框指定一个任务，也可选择不监看。
 
 **此安装包仅为 ad-hoc 签名，未经过 Apple Developer ID 签名或公证。** 首次打开可能被 Gatekeeper 拦截。请先确认下载来源与校验值；若信任该版本，可参考 [Apple 官方的安全打开说明](https://support.apple.com/en-us/102445)，在“系统设置 → 隐私与安全”中针对该 App 选择“仍要打开”。不要关闭全局安全检查；若提示恶意软件或文件损坏，先停止并核对来源。
 
@@ -135,7 +135,7 @@ python3 "/Applications/AI Touch Bar.app/Contents/Resources/helper/quota_touchbar
 | 工程验证 | 10 项状态桥接测试、44 项上游模块测试、额度／状态自检、原生 AppKit 自检及签名检查通过。 |
 | 界面验证 | 已检查安装版的下拉选项、停用后隐藏、刷新保留选择，以及 CODEX／KIMI 模拟动画布局；已切回实时模式。 |
 | 真实 Kimi 流程 | 最近一次检查未连接到有效本地服务；真实任务的多任务切换、审批、完成与断连恢复仍待联调。离线双任务测试不等于真实流程验收。 |
-| 下载包 | GitHub 仍只有 v0.2.1 预发布包；本次同步源码与文档，没有创建 0.2.2／0.2.3 Release。 |
+| 下载包 | 已发布 [v0.2.3 预发布包](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.3)及 SHA-256 校验文件；仅 arm64、ad-hoc 签名、未公证。v0.2.1 仍保留，0.2.2 未单独发布。 |
 
 下一步优先验证 Kimi 的真实运行链路，不继续改动画或额度规则。代码入口、测试命令、已排除的错误路线和接手清单见 [HANDOFF](docs/HANDOFF.md)。
 
