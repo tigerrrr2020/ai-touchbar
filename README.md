@@ -10,6 +10,8 @@
 
 AI Touch Bar 是一个原生 macOS 菜单栏小应用，把 **Codex / Kimi Code 的额度与任务状态**放到 Touch Bar：不必反复切窗口，也不用一直盯着一串百分比。
 
+菜单栏和 App 图标共用同一枚图钉：App 图标保持白色图钉本体，左下针体填入绿/青渐变并画出刻度，用针体本身表达额度，不再单独放一条进度条。
+
 [下载安装包](https://github.com/tigerrrr2020/ai-touchbar/releases/tag/v0.2.7) · [从源码构建](#从源码构建) · [开发交接](docs/HANDOFF.md) · [隐私与数据访问](docs/PRIVACY.md) · [MIT 许可证](LICENSE)
 
 > 当前版本：**0.2.7 · 实验性预发布版**，源码与 Apple Silicon 安装包均已发布。本版修正套餐缺失额度窗口的显示：Codex Pro 这类没有 5 小时窗口的套餐，HOUR 行保留但置灰（不再显示 `?`），套餐变更恢复窗口后自动点亮。不依赖 BetterTouchTool（BTT）。Codex 需要手动选择监看的任务；Kimi 可自动监看唯一活动任务，或手动指定一个任务。两者都不会自动跟随当前对话页面。
@@ -187,6 +189,8 @@ build.sh / test.sh   本机构建与离线检查
 ```
 
 构建已带齐图标与动画，无需重新生成资源。若维护动画，`scripts/generate_status_assets.py` 可用 Pillow 重建帧和 GIF；Pillow 仅是开发工具依赖，不随 App 分发。
+
+图标资源在 `Assets/`：`AppIcon.icns` 是 App 图标，`menubar-pin.svg` 是菜单栏／Touch Bar 共用的图钉。`main` 已更新图标；已发布的 0.2.7 安装包仍是旧图标，下一次打包生效。
 
 额度示意图可用 `python3 scripts/generate_quota_previews.py` 离线重建，只使用固定样例与现有绘图函数，不读取账号或调用额度接口。
 

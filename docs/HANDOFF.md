@@ -66,9 +66,17 @@ Kimi 当前用量接口未提供月额度字段。小时／周显示有余量，
 ### 保持不变
 
 - Codex 手动监看一个任务；两种提供商都不自动跟随当前对话页面。
-- 像素字体、两组状态动画、额度刻度与红色 `WAIT!` 规则、图钉图标、Touch Bar 收起／恢复行为保持不变。
+- 像素字体、两组状态动画、额度刻度与红色 `WAIT!` 规则、Touch Bar 收起／恢复行为保持不变；菜单栏图钉造型保留（App 图标更新见下节）。
 - `⌘W`／红色关闭按钮只关闭操作框；退出仍走图钉菜单。没有开机自启、自动更新、听写或 Siri 替换。
 - 不恢复 BTT、不自动启动 Kimi 服务、不自动审批或创建任务。
+
+### 图标更新（2026-10-23）
+
+- App 图标改为以菜单栏图钉为主体：白色图钉本体 + 左下针体绿/青渐变 + 深色刻度线，不再单独绘制进度条。
+- 菜单栏保留原图钉造型，仅扩大 SVG viewBox 留白，18px 下更接近系统图标比例；Touch Bar 恢复按钮继续共用这枚图钉。
+- 资源：`Assets/AppIcon.png`（1024×1024）、`Assets/AppIcon.icns`、`Assets/menubar-pin.svg`。
+- 仅图标资源变化，无代码或状态逻辑改动；本机构建、`--self-test`、`codesign --verify --deep --strict` 通过。
+- `main` 已更新图标；已发布的 0.2.7 安装包未重新打包，下一次发布生效。本机已安装的 0.2.7 副本是就地替换资源并重签的，不代表发布包已更新。
 
 ## 接手代码入口
 
@@ -101,6 +109,7 @@ Kimi 当前用量接口未提供月额度字段。小时／周显示有余量，
 | Touch Bar | [Sources/TouchBarUI.swift](../Sources/TouchBarUI.swift)、[Sources/ControlStrip.swift](../Sources/ControlStrip.swift) | NSTouchBar 组装、收起／恢复按钮、状态图标与额度区绘制入口。 |
 | 状态动画 | [Sources/StatusDemo.swift](../Sources/StatusDemo.swift)、`status-assets/` | 两组像素动画帧的加载与播放；帧由 `scripts/generate_status_assets.py`（Pillow）离线生成，不要手改 PNG。 |
 | 额度绘制 | [Sources/QuotaReader.swift](../Sources/QuotaReader.swift)、[helper/quota_touchbar.py](../helper/quota_touchbar.py) | Swift 侧读缓存，Python 侧查询与绘图；示意图由 `scripts/generate_quota_previews.py` 重建。 |
+| 图标资源 | [Assets/AppIcon.icns](../Assets/AppIcon.icns)、[Assets/menubar-pin.svg](../Assets/menubar-pin.svg) | App 图标与菜单栏共用图钉；App 图标针体是绿/青额度刻度。改图标后需重建 App 并重启菜单栏进程。 |
 
 修改时的约束与流程：
 
