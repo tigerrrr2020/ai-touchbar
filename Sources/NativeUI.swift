@@ -19,8 +19,11 @@ final class TBOperationWindow: NSWindow {
 final class NativeUI: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var window: NSWindow?
-    private let quotaImage = NSImageView()
-    private let quotaUnknown = NSTextField(labelWithString: "额度未知")
+    private let codexQuotaView = NSImageView()
+    private let kimiQuotaView = NSImageView()
+    private var lastQuotaImage: NSImage?
+    private let codexQuotaUnknown = NSTextField(labelWithString: "额度未知")
+    private let kimiQuotaUnknown = NSTextField(labelWithString: "额度未知")
     private let codexImage = NSImageView()
     private let kimiImage = NSImageView()
     private let title = NSTextField(labelWithString: "正在读取额度和实时状态…")
@@ -63,9 +66,13 @@ final class NativeUI: NSObject, NSApplicationDelegate {
         liveReader = live
         quota.onImage = { [weak self, weak barUI] image, message in
             guard let self else { return }
-            self.quotaImage.image = image
-            self.quotaImage.isHidden = image == nil
-            self.quotaUnknown.isHidden = image != nil
+            self.lastQuotaImage = image
+            self.codexQuotaView.image = Self.quotaHalf(image, codex: true)
+            self.kimiQuotaView.image = Self.quotaHalf(image, codex: false)
+            self.codexQuotaView.isHidden = image == nil
+            self.kimiQuotaView.isHidden = image == nil
+            self.codexQuotaUnknown.isHidden = image != nil
+            self.kimiQuotaUnknown.isHidden = image != nil
             self.quotaMessage = message
             barUI?.setQuota(image)
             self.updateLiveDisplay()
@@ -109,9 +116,9 @@ final class NativeUI: NSObject, NSApplicationDelegate {
             item.button?.title = "AI"
         }
         let menu = NSMenu()
-        menu.addItem(withTitle: "打开TB 操作框", action: #selector(openPreview), keyEquivalent: "")
-        menu.addItem(withTitle: "显示Touch Bar", action: #selector(showTouchBar), keyEquivalent: "")
-        menu.addItem(withTitle: "隐藏Touch Bar", action: #selector(hideTouchBar), keyEquivalent: "")
+        menu.addItem(withTitle: "打开 TB 操作框", action: #selector(openPreview), keyEquivalent: "")
+        menu.addItem(withTitle: "显示 Touch Bar", action: #selector(showTouchBar), keyEquivalent: "")
+        menu.addItem(withTitle: "隐藏 Touch Bar", action: #selector(hideTouchBar), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "退出", action: #selector(quit), keyEquivalent: "")
         menu.items.forEach { $0.target = self }
@@ -120,65 +127,85 @@ final class NativeUI: NSObject, NSApplicationDelegate {
     }
 
     private func setupPreview() {
-        let window = TBOperationWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 482), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let window = TBOperationWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 320), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.title = "TB 操作框"
         window.center()
         let content = NSView(frame: window.contentView!.bounds)
         content.autoresizingMask = [.width, .height]; window.contentView = content
-        let overviewHeading = NSTextField(labelWithString: "实时概览")
-        overviewHeading.frame = NSRect(x: 24, y: 443, width: 592, height: 18)
-        overviewHeading.font = .systemFont(ofSize: 13, weight: .semibold); content.addSubview(overviewHeading)
-        title.frame = NSRect(x: 24, y: 419, width: 592, height: 16)
-        title.font = .systemFont(ofSize: 11); title.textColor = .secondaryLabelColor; content.addSubview(title)
-        let preview = NSView(frame: NSRect(x: 24, y: 280, width: 592, height: 128))
-        preview.wantsLayer = true; preview.layer?.backgroundColor = NSColor.black.cgColor; preview.layer?.cornerRadius = 8
-        content.addSubview(preview)
-        quotaImage.frame = NSRect(x: 16, y: 56, width: 480, height: 60)
-        quotaImage.imageScaling = .scaleProportionallyDown; quotaImage.isHidden = true; preview.addSubview(quotaImage)
-        quotaUnknown.frame = NSRect(x: 16, y: 72, width: 300, height: 28)
-        quotaUnknown.font = .monospacedSystemFont(ofSize: 12, weight: .medium); quotaUnknown.textColor = .white; preview.addSubview(quotaUnknown)
-        codexImage.frame = NSRect(x: 16, y: 12, width: 100, height: 30)
-        kimiImage.frame = NSRect(x: 256, y: 12, width: 80, height: 30)
-        codexImage.imageScaling = .scaleProportionallyDown; kimiImage.imageScaling = .scaleProportionallyDown
-        preview.addSubview(codexImage); preview.addSubview(kimiImage)
-        let monitorHeading = NSTextField(labelWithString: "监看任务")
-        monitorHeading.frame = NSRect(x: 24, y: 248, width: 592, height: 18)
-        monitorHeading.font = .systemFont(ofSize: 13, weight: .semibold); content.addSubview(monitorHeading)
-        taskPicker.frame = NSRect(x: 24, y: 212, width: 452, height: 28)
+        func makeHeading(_ text: String, x: CGFloat, y: CGFloat, width: CGFloat) {
+            let heading = NSTextField(labelWithString: text)
+            heading.frame = NSRect(x: x, y: y, width: width, height: 18)
+            heading.font = .systemFont(ofSize: 13, weight: .semibold)
+            content.addSubview(heading)
+        }
+        func makeSeparator(y: CGFloat) {
+            let separator = NSBox(frame: NSRect(x: 24, y: y, width: 592, height: 1))
+            separator.boxType = .separator
+            content.addSubview(separator)
+        }
+        func styleNote(_ field: NSTextField) {
+            field.font = .systemFont(ofSize: 11); field.textColor = .secondaryLabelColor
+            field.lineBreakMode = .byTruncatingTail
+        }
+        // 实时概览：每个模型一张卡片，上方为该模型额度（整图裁半），下方为状态动画。
+        // 新增模型时向 providerCards 追加一张卡片即可，卡片横向等宽排列。
+        makeHeading("实时概览", x: 24, y: 282, width: 592)
+        title.frame = NSRect(x: 24, y: 260, width: 592, height: 16)
+        styleNote(title); content.addSubview(title)
+        let providerCards: [(quota: NSImageView, status: NSImageView, statusWidth: CGFloat, unknown: NSTextField)] = [
+            (codexQuotaView, codexImage, 100, codexQuotaUnknown),
+            (kimiQuotaView, kimiImage, 80, kimiQuotaUnknown),
+        ]
+        for (index, card) in providerCards.enumerated() {
+            let cardView = NSView(frame: NSRect(x: 24 + CGFloat(index) * 304, y: 118, width: 288, height: 132))
+            cardView.wantsLayer = true; cardView.layer?.backgroundColor = NSColor.black.cgColor; cardView.layer?.cornerRadius = 8
+            content.addSubview(cardView)
+            card.quota.frame = NSRect(x: 24, y: 56, width: 240, height: 60)
+            card.quota.imageScaling = .scaleProportionallyDown; card.quota.isHidden = true
+            cardView.addSubview(card.quota)
+            card.status.frame = NSRect(x: (288 - card.statusWidth) / 2, y: 16, width: card.statusWidth, height: 30)
+            card.status.imageScaling = .scaleProportionallyDown
+            cardView.addSubview(card.status)
+            card.unknown.frame = NSRect(x: 24, y: 72, width: 240, height: 28)
+            card.unknown.font = .monospacedSystemFont(ofSize: 12, weight: .medium)
+            card.unknown.textColor = .white; card.unknown.alignment = .center
+            cardView.addSubview(card.unknown)
+        }
+        makeSeparator(y: 108)
+        // 监看任务：标题与刷新按钮同一行；Codex／Kimi 下拉框同一行，
+        // 各自的归属与状态说明跟在对应下拉框下方（截断时悬停看全文）。
+        // 刷新按钮同时刷新两个列表、各自保留选择；Touch Bar 显示／隐藏只在图钉菜单里。
+        makeHeading("监看任务", x: 24, y: 80, width: 200)
+        let refresh = NSButton(title: "刷新列表", target: self, action: #selector(refreshAllTasks))
+        refresh.bezelStyle = .rounded
+        refresh.toolTip = "同时刷新 Codex 与 Kimi 任务列表，保留当前选择"
+        refresh.frame = NSRect(x: 528, y: 75, width: 88, height: 28); content.addSubview(refresh)
+        taskPicker.frame = NSRect(x: 24, y: 42, width: 288, height: 28)
         taskPicker.target = self; taskPicker.action = #selector(selectTask(_:)); content.addSubview(taskPicker)
         taskPicker.toolTip = ""
-        let refresh = NSButton(title: "刷新 Codex 任务", target: self, action: #selector(refreshTasks))
-        refresh.frame = NSRect(x: 488, y: 212, width: 128, height: 28); content.addSubview(refresh)
-        pickerStatus.frame = NSRect(x: 24, y: 189, width: 592, height: 16)
-        pickerStatus.font = .systemFont(ofSize: 11); pickerStatus.textColor = .secondaryLabelColor; content.addSubview(pickerStatus)
-        kimiPicker.frame = NSRect(x: 24, y: 142, width: 452, height: 28)
+        kimiPicker.frame = NSRect(x: 328, y: 42, width: 288, height: 28)
         kimiPicker.target = self; kimiPicker.action = #selector(selectKimiTask(_:)); content.addSubview(kimiPicker)
-        let kimiRefresh = NSButton(title: "刷新 Kimi 任务", target: self, action: #selector(refreshKimiTasks))
-        kimiRefresh.frame = NSRect(x: 488, y: 142, width: 128, height: 28); content.addSubview(kimiRefresh)
-        kimiPickerStatus.frame = NSRect(x: 24, y: 119, width: 592, height: 16)
-        kimiPickerStatus.font = .systemFont(ofSize: 11); kimiPickerStatus.textColor = .secondaryLabelColor
+        pickerStatus.frame = NSRect(x: 24, y: 20, width: 288, height: 16)
+        styleNote(pickerStatus); content.addSubview(pickerStatus)
+        kimiPickerStatus.frame = NSRect(x: 328, y: 20, width: 288, height: 16)
+        styleNote(kimiPickerStatus)
         content.addSubview(kimiPickerStatus)
         rebuildKimiPicker()
-        let touchBarHeading = NSTextField(labelWithString: "Touch Bar 显示")
-        touchBarHeading.frame = NSRect(x: 24, y: 82, width: 280, height: 18)
-        touchBarHeading.font = .systemFont(ofSize: 13, weight: .semibold); content.addSubview(touchBarHeading)
-        let statusHeading = NSTextField(labelWithString: "状态测试")
-        statusHeading.frame = NSRect(x: 340, y: 82, width: 276, height: 18)
-        statusHeading.font = .systemFont(ofSize: 13, weight: .semibold); content.addSubview(statusHeading)
-        let show = NSButton(title: "显示 Touch Bar", target: self, action: #selector(showTouchBar))
-        let hide = NSButton(title: "隐藏", target: self, action: #selector(hideTouchBar))
-        show.frame = NSRect(x: 24, y: 47, width: 124, height: 28)
-        hide.frame = NSRect(x: 156, y: 47, width: 92, height: 28)
-        content.addSubview(show); content.addSubview(hide)
-        let test = NSButton(title: "测试模拟（48 秒）", target: self, action: #selector(replay))
-        test.frame = NSRect(x: 340, y: 47, width: 154, height: 28); content.addSubview(test)
-        let live = NSButton(title: "切回实时状态", target: self, action: #selector(useLive))
-        live.frame = NSRect(x: 502, y: 47, width: 114, height: 28); content.addSubview(live)
-        let testNote = NSTextField(labelWithString: "仅播放动画，不执行任务或消耗额度。")
-        testNote.frame = NSRect(x: 340, y: 22, width: 276, height: 14)
-        testNote.font = .systemFont(ofSize: 11); testNote.textColor = .secondaryLabelColor; content.addSubview(testNote)
         self.window = window
+    }
+
+    /// 额度整图为 480×60：左半 Codex、右半 Kimi（helper 固定布局）。
+    /// 操作框按模型裁半分行显示；Touch Bar 仍使用整图。
+    private static func quotaHalf(_ image: NSImage?, codex: Bool) -> NSImage? {
+        guard let image else { return nil }
+        let half = NSImage(size: NSSize(width: 240, height: 60))
+        half.lockFocus()
+        image.draw(in: NSRect(x: 0, y: 0, width: 240, height: 60),
+                   from: NSRect(x: codex ? 0 : 240, y: 0, width: 240, height: 60),
+                   operation: .sourceOver, fraction: 1)
+        half.unlockFocus()
+        return half
     }
 
     @objc private func openPreview() { window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
@@ -197,13 +224,14 @@ final class NativeUI: NSObject, NSApplicationDelegate {
     @objc private func hideTouchBar() { touchBarUI?.hide() }
     @objc private func quit() { NSApp.terminate(nil) }
 
-    @objc private func replay() {
+    /// 离线示例模式（--demo）启动时自动播放一轮；正常模式无入口。
+    private func replay() {
         liveReader?.pause(); kimiGrace = KimiGrace(); liveCodex = nil
         testStartedAt = ProcessInfo.processInfo.systemUptime
         startAnimationTimer()
         renderTestFrame()
     }
-    @objc private func useLive() {
+    private func useLive() {
         stateTimer?.invalidate(); stateTimer = nil; testStartedAt = nil
         if demoOnly {
             kimiGrace = KimiGrace(); liveCodex = nil
@@ -223,6 +251,11 @@ final class NativeUI: NSObject, NSApplicationDelegate {
     @objc private func refreshTasks() {
         guard !demoOnly else { pickerStatus.stringValue = "离线示例模式未读取 Codex 任务列表"; return }
         liveReader?.loadTasks { [weak self] in self?.setTasks($0) }
+    }
+
+    /// 操作框里唯一的刷新入口：两个列表都刷，各自保留当前选择。
+    @objc private func refreshAllTasks() {
+        refreshTasks(); refreshKimiTasks()
     }
 
     @objc private func selectKimiTask(_ sender: NSPopUpButton) {
@@ -292,6 +325,7 @@ final class NativeUI: NSObject, NSApplicationDelegate {
         else if let pin = kimiSelection.sessionID { note = "手动监看 Kimi · \(pin.prefix(8)) · \(kimiReason == "idle" ? "空闲" : "当前任务")" }
         else { note = "Kimi：自动监看唯一活跃任务" }
         kimiPickerStatus.stringValue = (demoOnly ? "模拟列表 · " : "") + note + (kimiListTruncated ? " · 仅显示前 40 项" : "")
+        kimiPickerStatus.toolTip = kimiPickerStatus.stringValue
         kimiPicker.toolTip = kimiSelection.sessionID ?? "自动模式仅在任务身份唯一时显示状态"
     }
 
@@ -361,7 +395,7 @@ final class NativeUI: NSObject, NSApplicationDelegate {
         let kimi = kimiGrace.visible(now: ProcessInfo.processInfo.systemUptime)
         codexImage.image = liveCodex.flatMap { demo?.image($0, tick: tick) }
         kimiImage.image = kimi.flatMap { demo?.image($0, tick: tick, kimi: true) }
-        touchBarUI?.setQuota(quotaImage.image)
+        touchBarUI?.setQuota(lastQuotaImage)
         touchBarUI?.updateLive(codex: liveCodex, kimi: kimi, tick: tick)
         let kimiNote: String
         switch kimiReason {
@@ -398,6 +432,7 @@ final class NativeUI: NSObject, NSApplicationDelegate {
             pickerStatus.stringValue = "Codex：手动监看 · 任务不在列表（\(id.prefix(8))）"
             taskPicker.toolTip = "所选任务不在当前列表：\(id)"
         } else { pickerStatus.stringValue = "Codex：未选择任务（手动监看）"; taskPicker.toolTip = "" }
+        pickerStatus.toolTip = pickerStatus.stringValue
     }
 
     private func showNotice(_ text: String) {
