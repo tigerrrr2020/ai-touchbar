@@ -336,46 +336,109 @@ def _kimi_live_sessions():
         if payload.get("code") != 0 or data.get("has_more") is not False:
             return None
         items = data.get("items")
-        return items if isinstance(items, list) and all(isinstance(s, dict) for s in items) else None
+        return items if isinstance(items, list) and len(items) <= 100 and all(isinstance(s, dict) for s in items) else None
     except (OSError, ValueError, TypeError, AttributeError):
         return None
 
 
-def kimi_live_status():
+def canonical_kimi_id(value):
+    if not isinstance(value, str):
+        return None
+    value = value.removeprefix("session_").lower()
+    return value if UUID.fullmatch(value) else None
+
+
+def _validated_kimi_sessions(sessions):
+    """Never discard broken identities to manufacture a unique candidate."""
+    if not isinstance(sessions, list) or len(sessions) > 100:
+        return None
+    validated = []
+    seen = set()
+    for session in sessions:
+        identity = canonical_kimi_id(session.get("id")) if isinstance(session, dict) else None
+        if identity is None or identity in seen:
+            return None
+        seen.add(identity)
+        validated.append((identity, session))
+    return validated
+
+
+def _kimi_active(session):
+    return (session.get("busy") is True or session.get("main_turn_active") is True
+            or session.get("pending_interaction") in ("approval", "question"))
+
+
+def kimi_selection_status(mode="auto", session_id=None):
+    safe_id = session_id.lower() if isinstance(session_id, str) and UUID.fullmatch(session_id.lower()) else None
+    result = {"kimi": "未知", "kimi_mode": mode if mode in ("auto", "pinned", "off") else "invalid",
+              "kimi_session_id": safe_id,
+              "kimi_resolved_session_id": None, "kimi_reason": "invalid_selection"}
+    # Off and invalid selections do not even look for daemon/token/wire files.
+    if (mode not in ("auto", "pinned", "off")
+            or (mode == "pinned" and (not isinstance(session_id, str)
+                                      or not UUID.fullmatch(session_id.lower())))
+            or (mode != "pinned" and session_id is not None)):
+        return result
+    if mode == "off":
+        result.update(kimi="空闲", kimi_reason="off")
+        return result
+    if mode == "pinned":
+        session_id = session_id.lower()
+        result["kimi_session_id"] = session_id
     sessions = _kimi_live_sessions()
     if sessions is None:
-        return "不可用"
-    active = [s for s in sessions if s.get("busy") is True
-              or s.get("main_turn_active") is True
-              or s.get("pending_interaction") in ("approval", "question")]
-    if len(active) > 1:
-        return "未知"
-    if active:
-        session = active[0]
+        result.update(kimi="不可用", kimi_reason="unavailable")
+        return result
+    validated = _validated_kimi_sessions(sessions)
+    if validated is None:
+        result["kimi_reason"] = "ambiguous"
+        return result
+    if mode == "pinned":
+        selected = [(identity, session) for identity, session in validated if identity == session_id]
+        if not selected:
+            result["kimi_reason"] = "not_found"
+            return result
+    else:
+        selected = [(identity, session) for identity, session in validated if _kimi_active(session)]
+        if len(selected) > 1:
+            result["kimi_reason"] = "ambiguous"
+            return result
+    if selected:
+        identity, session = selected[0]
+        result["kimi_resolved_session_id"] = identity
         if session.get("pending_interaction") in ("approval", "question"):
-            return "等待审批"
-        session_id = session.get("id")
-        if not isinstance(session_id, str):
-            return "未知"
-        session_id = session_id.removeprefix("session_")
-        path = _session_path("kimi", session_id)
-        status = _kimi_status(path) if path else "未知"
-        # The daemon confirms activity; stale tail completion must not win.
-        return status if status in ("思考", "命令", "改文件") else "思考"
-    # Show a briefly completed task only with both recent metadata and a
-    # successful terminal wire event. Old failures/abandoned logs remain hidden.
+            result.update(kimi="等待审批", kimi_reason="active")
+            return result
+        if _kimi_active(session):
+            path = _session_path("kimi", identity)
+            status = _kimi_status(path) if path else "未知"
+            result.update(kimi=status if status in ("思考", "命令", "改文件") else "思考",
+                          kimi_reason="active")
+            return result
+        candidates = selected
+    else:
+        candidates = validated
+    # Completion requires both current metadata and a recent successful wire.
     completed = []
-    for session in sessions:
+    for identity, session in candidates:
         age = _age(session.get("updated_at"))
         if age is not None and 0 <= age <= COMPLETED_SECONDS:
-            session_id = session.get("id")
-            if not isinstance(session_id, str):
-                continue
-            session_id = session_id.removeprefix("session_")
-            path = _session_path("kimi", session_id)
+            path = _session_path("kimi", identity)
             if path and _kimi_status(path) == "完成":
-                completed.append(session_id)
-    return "完成" if len(completed) == 1 else "未知"
+                completed.append(identity)
+    if len(completed) == 1:
+        result.update(kimi="完成", kimi_reason="completed", kimi_resolved_session_id=completed[0])
+    elif len(completed) > 1:
+        result["kimi_reason"] = "ambiguous"
+    else:
+        result.update(kimi="空闲", kimi_reason="idle" if validated else "no_tasks")
+    return result
+
+
+def kimi_live_status():
+    # Compatibility for the standalone label helper.
+    result = kimi_selection_status()
+    return "未知" if result["kimi"] == "空闲" else result["kimi"]
 
 
 def _label(provider, status):

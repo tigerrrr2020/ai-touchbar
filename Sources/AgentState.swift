@@ -16,6 +16,8 @@ enum AgentState {
 struct KimiGrace {
     private(set) var lastActive: DemoState?
     private(set) var confirmedAt: TimeInterval?
+    private var selection: KimiSelection?
+    private var resolvedSessionID: String?
     static let seconds: TimeInterval = 10
 
     var rawState: DemoState? { lastActive }
@@ -39,5 +41,18 @@ struct KimiGrace {
         lastActive = nil
         confirmedAt = nil
         return nil
+    }
+
+    mutating func update(_ raw: String?, selection requested: KimiSelection, resolvedID: String?,
+                         reason: String, now: TimeInterval) -> DemoState? {
+        if selection != requested || (reason != "unavailable" && resolvedSessionID != resolvedID) {
+            lastActive = nil; confirmedAt = nil
+        }
+        selection = requested
+        if reason != "unavailable" { resolvedSessionID = resolvedID }
+        if requested == .off || !["active", "completed", "unavailable"].contains(reason) {
+            return update("空闲", now: now)
+        }
+        return update(reason == "unavailable" ? "不可用" : raw, now: now)
     }
 }

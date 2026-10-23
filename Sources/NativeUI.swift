@@ -26,6 +26,8 @@ final class NativeUI: NSObject, NSApplicationDelegate {
     private let title = NSTextField(labelWithString: "正在读取额度和实时状态…")
     private let taskPicker = NSPopUpButton(frame: .zero, pullsDown: false)
     private let pickerStatus = NSTextField(labelWithString: "Codex：未选择任务（手动监看）")
+    private let kimiPicker = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let kimiPickerStatus = NSTextField(labelWithString: "Kimi：正在连接本地服务…")
     private var stateTimer: Timer?
     private var refreshTimer: Timer?
     private var tick = 0
@@ -42,6 +44,11 @@ final class NativeUI: NSObject, NSApplicationDelegate {
     private var kimiGrace = KimiGrace()
     private var liveCodex: DemoState?
     private var kimiRaw = "不可用"
+    private var kimiSelection: KimiSelection = .auto
+    private var kimiTasks: [KimiTask] = []
+    private var kimiListAvailable = false
+    private var kimiListTruncated = false
+    private var kimiReason = "unavailable"
 
     func applicationDidFinishLaunching(_ note: Notification) {
         guard let resources = Bundle.main.resourceURL else { NSApp.terminate(nil); return }
@@ -69,9 +76,14 @@ final class NativeUI: NSObject, NSApplicationDelegate {
         quota.refresh()
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak quota] _ in quota?.refresh() }
         openPreview()
-        if demoOnly { replay() }
+        if demoOnly {
+            setKimiTasks(KimiTask.demoTasks, truncated: false, reason: "ambiguous")
+            pickerStatus.stringValue = "离线示例模式未读取 Codex 任务列表"
+            replay()
+        }
         else {
             live.loadTasks { [weak self] tasks in self?.setTasks(tasks) }
+            refreshKimiTasks()
             live.start()
             updateLiveDisplay()
         }
@@ -108,18 +120,18 @@ final class NativeUI: NSObject, NSApplicationDelegate {
     }
 
     private func setupPreview() {
-        let window = TBOperationWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 412), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let window = TBOperationWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 482), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.title = "TB 操作框"
         window.center()
         let content = NSView(frame: window.contentView!.bounds)
         content.autoresizingMask = [.width, .height]; window.contentView = content
         let overviewHeading = NSTextField(labelWithString: "实时概览")
-        overviewHeading.frame = NSRect(x: 24, y: 373, width: 592, height: 18)
+        overviewHeading.frame = NSRect(x: 24, y: 443, width: 592, height: 18)
         overviewHeading.font = .systemFont(ofSize: 13, weight: .semibold); content.addSubview(overviewHeading)
-        title.frame = NSRect(x: 24, y: 349, width: 592, height: 16)
+        title.frame = NSRect(x: 24, y: 419, width: 592, height: 16)
         title.font = .systemFont(ofSize: 11); title.textColor = .secondaryLabelColor; content.addSubview(title)
-        let preview = NSView(frame: NSRect(x: 24, y: 210, width: 592, height: 128))
+        let preview = NSView(frame: NSRect(x: 24, y: 280, width: 592, height: 128))
         preview.wantsLayer = true; preview.layer?.backgroundColor = NSColor.black.cgColor; preview.layer?.cornerRadius = 8
         content.addSubview(preview)
         quotaImage.frame = NSRect(x: 16, y: 56, width: 480, height: 60)
@@ -131,15 +143,23 @@ final class NativeUI: NSObject, NSApplicationDelegate {
         codexImage.imageScaling = .scaleProportionallyDown; kimiImage.imageScaling = .scaleProportionallyDown
         preview.addSubview(codexImage); preview.addSubview(kimiImage)
         let monitorHeading = NSTextField(labelWithString: "监看任务")
-        monitorHeading.frame = NSRect(x: 24, y: 178, width: 592, height: 18)
+        monitorHeading.frame = NSRect(x: 24, y: 248, width: 592, height: 18)
         monitorHeading.font = .systemFont(ofSize: 13, weight: .semibold); content.addSubview(monitorHeading)
-        taskPicker.frame = NSRect(x: 24, y: 142, width: 452, height: 28)
+        taskPicker.frame = NSRect(x: 24, y: 212, width: 452, height: 28)
         taskPicker.target = self; taskPicker.action = #selector(selectTask(_:)); content.addSubview(taskPicker)
         taskPicker.toolTip = ""
         let refresh = NSButton(title: "刷新 Codex 任务", target: self, action: #selector(refreshTasks))
-        refresh.frame = NSRect(x: 488, y: 142, width: 128, height: 28); content.addSubview(refresh)
-        pickerStatus.frame = NSRect(x: 24, y: 119, width: 592, height: 16)
+        refresh.frame = NSRect(x: 488, y: 212, width: 128, height: 28); content.addSubview(refresh)
+        pickerStatus.frame = NSRect(x: 24, y: 189, width: 592, height: 16)
         pickerStatus.font = .systemFont(ofSize: 11); pickerStatus.textColor = .secondaryLabelColor; content.addSubview(pickerStatus)
+        kimiPicker.frame = NSRect(x: 24, y: 142, width: 452, height: 28)
+        kimiPicker.target = self; kimiPicker.action = #selector(selectKimiTask(_:)); content.addSubview(kimiPicker)
+        let kimiRefresh = NSButton(title: "刷新 Kimi 任务", target: self, action: #selector(refreshKimiTasks))
+        kimiRefresh.frame = NSRect(x: 488, y: 142, width: 128, height: 28); content.addSubview(kimiRefresh)
+        kimiPickerStatus.frame = NSRect(x: 24, y: 119, width: 592, height: 16)
+        kimiPickerStatus.font = .systemFont(ofSize: 11); kimiPickerStatus.textColor = .secondaryLabelColor
+        content.addSubview(kimiPickerStatus)
+        rebuildKimiPicker()
         let touchBarHeading = NSTextField(labelWithString: "Touch Bar 显示")
         touchBarHeading.frame = NSRect(x: 24, y: 82, width: 280, height: 18)
         touchBarHeading.font = .systemFont(ofSize: 13, weight: .semibold); content.addSubview(touchBarHeading)
@@ -187,12 +207,11 @@ final class NativeUI: NSObject, NSApplicationDelegate {
         stateTimer?.invalidate(); stateTimer = nil; testStartedAt = nil
         if demoOnly {
             kimiGrace = KimiGrace(); liveCodex = nil
-            touchBarUI?.updateLive(codex: nil, kimi: nil, tick: tick)
-            title.stringValue = "离线额度示例 · --demo 禁用实时状态查询"
+            updateLiveDisplay()
             return
         }
         tick = 0; kimiGrace = KimiGrace(); liveCodex = nil
-        liveReader?.start(); refreshTasks(); updateLiveDisplay()
+        liveReader?.start(); refreshTasks(); refreshKimiTasks(); updateLiveDisplay()
     }
     @objc private func selectTask(_ sender: NSPopUpButton) {
         guard !demoOnly else { pickerStatus.stringValue = "离线示例模式未读取 Codex 任务列表"; return }
@@ -204,6 +223,76 @@ final class NativeUI: NSObject, NSApplicationDelegate {
     @objc private func refreshTasks() {
         guard !demoOnly else { pickerStatus.stringValue = "离线示例模式未读取 Codex 任务列表"; return }
         liveReader?.loadTasks { [weak self] in self?.setTasks($0) }
+    }
+
+    @objc private func selectKimiTask(_ sender: NSPopUpButton) {
+        let value = sender.selectedItem?.representedObject as? String
+        let next: KimiSelection
+        if value == "off" { next = .off }
+        else if let value, LiveStatusReader.validUUID(value), let id = UUID(uuidString: value) { next = .pinned(id) }
+        else { next = .auto }
+        guard next != kimiSelection else { return }
+        kimiSelection = next
+        // Clear synchronously, before the new helper request can be queued.
+        kimiGrace = KimiGrace()
+        kimiRaw = next == .off ? "空闲" : "未知"
+        kimiReason = next == .off ? "off" : "idle"
+        if demoOnly {
+            stateTimer?.invalidate(); stateTimer = nil; testStartedAt = nil; liveCodex = nil
+        } else { liveReader?.setKimiSelection(next) }
+        updateKimiPickerLabel()
+        updateLiveDisplay()
+    }
+
+    @objc private func refreshKimiTasks() {
+        if demoOnly { setKimiTasks(KimiTask.demoTasks, truncated: false, reason: "ambiguous"); return }
+        liveReader?.loadKimiTasks { [weak self] tasks, truncated, reason in
+            self?.setKimiTasks(tasks, truncated: truncated, reason: reason)
+        }
+    }
+
+    private func setKimiTasks(_ value: [KimiTask]?, truncated: Bool, reason: String) {
+        kimiTasks = value ?? []
+        kimiListAvailable = value != nil
+        kimiListTruncated = truncated
+        if value == nil || value?.isEmpty == true { kimiReason = reason }
+        rebuildKimiPicker()
+    }
+
+    private func rebuildKimiPicker() {
+        kimiPicker.removeAllItems()
+        for (label, value) in [("Kimi：自动 · 唯一活跃任务", "auto"), ("Kimi：不监看", "off")] {
+            let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
+            item.representedObject = value; kimiPicker.menu?.addItem(item)
+        }
+        for task in kimiTasks {
+            let item = NSMenuItem(title: (task.active ? "● " : "") + task.title, action: nil, keyEquivalent: "")
+            item.representedObject = task.id; kimiPicker.menu?.addItem(item)
+        }
+        if let pin = kimiSelection.sessionID, !kimiTasks.contains(where: { $0.id == pin }) {
+            let item = NSMenuItem(title: "所选 Kimi 任务暂不在列表 · \(pin.prefix(8))", action: nil, keyEquivalent: "")
+            item.representedObject = pin; kimiPicker.menu?.addItem(item)
+        }
+        let selected = kimiSelection.sessionID ?? kimiSelection.mode
+        if let item = kimiPicker.itemArray.first(where: { ($0.representedObject as? String) == selected }) {
+            kimiPicker.select(item)
+        }
+        updateKimiPickerLabel()
+    }
+
+    private func updateKimiPickerLabel() {
+        let note: String
+        if kimiSelection == .off { note = "Kimi：已停用监看" }
+        else if kimiReason == "unavailable" { note = "Kimi：本地服务未连接 · 点击刷新重试" }
+        else if kimiReason == "not_found" { note = "Kimi：所选任务已不在当前服务列表 · 保留选择" }
+        else if kimiReason == "ambiguous" && kimiSelection == .auto { note = "Kimi：多个活跃任务 · 请手动选择" }
+        else if kimiReason == "ambiguous" || kimiReason == "invalid_selection" { note = "Kimi：任务身份无法确认 · 点击刷新重试" }
+        else if !kimiListAvailable { note = "Kimi：未取得任务列表 · 点击刷新重试" }
+        else if kimiSelection == .auto && (kimiReason == "idle" || kimiReason == "no_tasks") { note = "Kimi：暂无活跃任务" }
+        else if let pin = kimiSelection.sessionID { note = "手动监看 Kimi · \(pin.prefix(8)) · \(kimiReason == "idle" ? "空闲" : "当前任务")" }
+        else { note = "Kimi：自动监看唯一活跃任务" }
+        kimiPickerStatus.stringValue = (demoOnly ? "模拟列表 · " : "") + note + (kimiListTruncated ? " · 仅显示前 40 项" : "")
+        kimiPicker.toolTip = kimiSelection.sessionID ?? "自动模式仅在任务身份唯一时显示状态"
     }
 
     private func setTasks(_ value: [CodexTask]?) {
@@ -237,11 +326,14 @@ final class NativeUI: NSObject, NSApplicationDelegate {
     }
 
     private func accept(_ snapshot: LiveStatusSnapshot) {
-        guard testStartedAt == nil else { return }
+        guard testStartedAt == nil, snapshot.kimiSelection == kimiSelection else { return }
         let now = ProcessInfo.processInfo.systemUptime
         kimiRaw = snapshot.kimi ?? "不可用"
-        _ = kimiGrace.update(kimiRaw, now: now)
+        kimiReason = snapshot.kimiReason
+        _ = kimiGrace.update(kimiRaw, selection: kimiSelection, resolvedID: snapshot.kimiResolvedSessionID,
+                             reason: snapshot.kimiReason, now: now)
         liveCodex = AgentState.display(snapshot.codex)
+        updateKimiPickerLabel()
         updateLiveDisplay()
     }
 
@@ -259,13 +351,30 @@ final class NativeUI: NSObject, NSApplicationDelegate {
 
     private func updateLiveDisplay() {
         guard testStartedAt == nil else { return }
+        if demoOnly {
+            let fixture = KimiTask.demoStatus(selection: kimiSelection)
+            kimiRaw = fixture.raw; kimiReason = fixture.reason
+            _ = kimiGrace.update(fixture.raw, selection: kimiSelection, resolvedID: fixture.resolvedID,
+                                 reason: fixture.reason, now: ProcessInfo.processInfo.systemUptime)
+            updateKimiPickerLabel()
+        }
         let kimi = kimiGrace.visible(now: ProcessInfo.processInfo.systemUptime)
         codexImage.image = liveCodex.flatMap { demo?.image($0, tick: tick) }
         kimiImage.image = kimi.flatMap { demo?.image($0, tick: tick, kimi: true) }
         touchBarUI?.setQuota(quotaImage.image)
         touchBarUI?.updateLive(codex: liveCodex, kimi: kimi, tick: tick)
-        let kimiLabel = kimi?.label ?? (kimiRaw == "不可用" ? "不可用" : kimiRaw == "空闲" ? "空闲" : "未知/歧义")
-        title.stringValue = "\(demoOnly ? "离线额度示例" : quotaMessage) · Codex：\(selectedThreadID == nil ? "未选择" : liveCodex?.label ?? "空闲/未知") · Kimi：\(kimiLabel)"
+        let kimiNote: String
+        switch kimiReason {
+        case "unavailable": kimiNote = "服务未连接"
+        case "off": kimiNote = "已停用"
+        case "ambiguous": kimiNote = kimiSelection == .auto ? "多任务待选择" : "任务身份不明"
+        case "not_found": kimiNote = "所选任务不在列表"
+        case "idle", "no_tasks": kimiNote = "无活动任务"
+        case "invalid_selection": kimiNote = "任务身份不明"
+        default: kimiNote = "空闲/未知"
+        }
+        let kimiLabel = kimi?.label ?? kimiNote
+        title.stringValue = "\(demoOnly ? "离线模拟" : quotaMessage) · Codex：\(selectedThreadID == nil ? "未选择" : liveCodex?.label ?? "空闲/未知") · Kimi：\(kimiLabel)"
         if liveCodex != nil || kimi != nil { startAnimationTimer() }
         else { stateTimer?.invalidate(); stateTimer = nil }
     }

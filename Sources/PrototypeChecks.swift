@@ -74,6 +74,49 @@ enum PrototypeChecks {
         precondition(grace.update("完成", now: 121) == .complete)
         precondition(grace.visible(now: 999) == .complete)
         precondition(grace.update("空闲", now: 122) == nil)
+        let a = KimiSelection.pinned(UUID(uuidString: "11111111-1111-4111-8111-111111111111")!)
+        let b = KimiSelection.pinned(UUID(uuidString: "22222222-2222-4222-8222-222222222222")!)
+        precondition(a.mode == "pinned" && a.sessionID == "11111111-1111-4111-8111-111111111111")
+        precondition(KimiSelection.auto.sessionID == nil && KimiSelection.off.mode == "off")
+        for (requested, current) in [(a, b), (a, .off), (b, .off), (.auto, a)] {
+            precondition(!LiveStatusReader.acceptsCallback(requestGeneration: 7, currentGeneration: 7,
+                requestThreadID: nil, currentThreadID: nil, stopped: false, requestKimi: requested, currentKimi: current),
+                "old A/B/off callback must never reach a new selection")
+        }
+        precondition(!LiveStatusReader.acceptsCallback(requestGeneration: 7, currentGeneration: 8,
+            requestThreadID: nil, currentThreadID: nil, stopped: false, requestKimi: a, currentKimi: a))
+        func response(mode: String, pin: String?, resolved: String?, reason: String) -> BridgeResponse? {
+            var object: [String: Any] = ["kimi": "命令", "kimi_mode": mode, "kimi_reason": reason]
+            object["kimi_session_id"] = pin
+            object["kimi_resolved_session_id"] = resolved
+            return (try? JSONSerialization.data(withJSONObject: object)).flatMap { try? JSONDecoder().decode(BridgeResponse.self, from: $0) }
+        }
+        precondition(LiveStatusReader.matchesKimiResponse(response(mode: "pinned", pin: a.sessionID, resolved: a.sessionID, reason: "active"), selection: a))
+        precondition(!LiveStatusReader.matchesKimiResponse(response(mode: "pinned", pin: a.sessionID, resolved: b.sessionID, reason: "active"), selection: a))
+        precondition(!LiveStatusReader.matchesKimiResponse(response(mode: "auto", pin: nil, resolved: a.sessionID, reason: "active"), selection: a))
+        precondition(!LiveStatusReader.matchesKimiResponse(response(mode: "pinned", pin: a.sessionID, resolved: nil, reason: "active"), selection: a))
+        precondition(LiveStatusReader.matchesKimiResponse(response(mode: "pinned", pin: a.sessionID, resolved: nil, reason: "not_found"), selection: a))
+        precondition(LiveStatusReader.matchesKimiResponse(response(mode: "off", pin: nil, resolved: nil, reason: "off"), selection: .off))
+        grace = KimiGrace()
+        precondition(grace.update("命令", selection: a, resolvedID: a.sessionID, reason: "active", now: 100) == .command)
+        precondition(grace.update("不可用", selection: a, resolvedID: nil, reason: "unavailable", now: 109) == .command,
+                     "transport failure without an identity must preserve same-selection grace")
+        precondition(grace.visible(now: 110.01) == nil)
+        precondition(grace.update("不可用", selection: b, resolvedID: nil, reason: "unavailable", now: 109) == nil,
+                     "selection changes must not inherit another task's grace")
+        for reason in ["idle", "no_tasks", "not_found", "ambiguous", "off", "invalid_selection"] {
+            _ = grace.update("改文件", selection: a, resolvedID: a.sessionID, reason: "active", now: 120)
+            precondition(grace.update("未知", selection: a, resolvedID: nil, reason: reason, now: 121) == nil)
+        }
+        _ = grace.update("命令", selection: .auto, resolvedID: a.sessionID, reason: "active", now: 130)
+        precondition(grace.update("未知", selection: .auto, resolvedID: b.sessionID, reason: "active", now: 131) == nil,
+                     "auto resolution moving A to B cannot borrow task A's icon")
+        precondition(grace.update("命令", selection: a, resolvedID: a.sessionID, reason: "active", now: 140) == .command)
+        precondition(grace.update("不可用", selection: .off, resolvedID: nil, reason: "unavailable", now: 141) == nil)
+        precondition(KimiTask.demoTasks.count == 2 && KimiTask.demoStatus(selection: .auto).reason == "ambiguous")
+        precondition(KimiTask.demoStatus(selection: a).raw == "命令")
+        precondition(KimiTask.demoStatus(selection: b).raw == "改文件")
+        precondition(KimiTask.demoStatus(selection: .off).reason == "off")
     }
 
     private static func testOfflineQuota(resources: URL) {
